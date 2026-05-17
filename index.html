@@ -1081,6 +1081,18 @@ body[data-layout="mobile"] .draw-btn{font-size:10px;padding:3px 8px}
 .chart-draw-wrap{position:relative}
 .draw-canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5}
 .draw-canvas.drawing{pointer-events:auto;cursor:crosshair}
+/* v0.9.14: 가격 커서 (꾹 누르면 가로선 + 가격 라벨) */
+.price-cursor{position:absolute;left:0;right:0;top:0;height:0;z-index:8;
+  pointer-events:none;display:none}
+.price-cursor.active{display:block}
+.price-cursor-line{position:absolute;left:0;right:0;top:0;height:0;
+  border-top:1.5px dashed #E8C96A;
+  box-shadow:0 0 6px rgba(232,201,106,0.5)}
+.price-cursor-label{position:absolute;right:4px;top:0;transform:translateY(-50%);
+  background:linear-gradient(135deg,#C9A84C,#E8C96A);color:#0a0a0a;
+  font-family:'Orbitron',sans-serif;font-weight:900;font-size:13px;
+  padding:3px 10px;border-radius:5px;white-space:nowrap;
+  box-shadow:0 2px 8px rgba(0,0,0,0.5)}
 .draw-mode-indicator{position:absolute;top:8px;left:8px;z-index:6;
   font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;
   padding:4px 10px;border-radius:6px;letter-spacing:1px;
@@ -1699,6 +1711,11 @@ var BULLSWING_FB = { ready:false, db:null, error:null };
         <div id="chart-pc"></div>
         <canvas class="draw-canvas" id="draw-canvas-pc"></canvas>
         <div class="draw-mode-indicator" id="draw-indicator-pc"></div>
+        <!-- v0.9.14: 가격 커서 (꾹 누르면 가로선+가격) -->
+        <div class="price-cursor" id="price-cursor-pc">
+          <div class="price-cursor-line"></div>
+          <div class="price-cursor-label" id="price-cursor-label-pc">-</div>
+        </div>
       </div>
       <div class="pattern-info" id="pattern-info-pc">
         <div class="pi-header">
@@ -1800,6 +1817,11 @@ var BULLSWING_FB = { ready:false, db:null, error:null };
       <div id="chart-mobile"></div>
       <canvas class="draw-canvas" id="draw-canvas-mobile"></canvas>
       <div class="draw-mode-indicator" id="draw-indicator-mobile"></div>
+      <!-- v0.9.14: 가격 커서 (꾹 누르면 가로선+가격) -->
+      <div class="price-cursor" id="price-cursor-mobile">
+        <div class="price-cursor-line"></div>
+        <div class="price-cursor-label" id="price-cursor-label-mobile">-</div>
+      </div>
     </div>
   </div>
 
@@ -2787,6 +2809,81 @@ function initGameChart() {
     updateOhlcvBar(param.time, cd.open, cd.high, cd.low, cd.close, vd ? vd.value : 0);
     if (layout === 'pc') showPatternInfoForTimePc(param.time);
   });
+  // v0.9.14: 가격 커서 (꾹 누르면 가로선+가격)
+  setupPriceCursor(layout);
+}
+
+// ============================================================
+// v0.9.14: 가격 커서 — 차트를 꾹 누른 채 드래그하면 가로선+가격 표시
+// ============================================================
+let _priceCursorTimer = null;
+let _priceCursorActive = false;
+function setupPriceCursor(layout) {
+  const container = layout === 'pc'
+    ? document.getElementById('chart-pc')
+    : document.getElementById('chart-mobile');
+  if (!container) return;
+  const cursor = document.getElementById('price-cursor-' + layout);
+  const label = document.getElementById('price-cursor-label-' + layout);
+  if (!cursor || !label) return;
+
+  const LONG_PRESS_MS = 350; // 꾹 누르는 판정 시간
+
+  // 좌표 Y → 가격 → 화면 표시
+  function updateCursorAt(clientY) {
+    if (!chart || !candleSeries) return;
+    const rect = container.getBoundingClientRect();
+    let y = clientY - rect.top;
+    y = Math.max(0, Math.min(y, rect.height));
+    const price = candleSeries.coordinateToPrice(y);
+    if (price == null) return;
+    cursor.style.top = y + 'px';
+    label.textContent = '₩' + Math.round(price).toLocaleString();
+  }
+  function showCursor(clientY) {
+    _priceCursorActive = true;
+    cursor.classList.add('active');
+    updateCursorAt(clientY);
+  }
+  function hideCursor() {
+    _priceCursorActive = false;
+    cursor.classList.remove('active');
+    if (_priceCursorTimer) { clearTimeout(_priceCursorTimer); _priceCursorTimer = null; }
+  }
+
+  // ===== 터치 (모바일) =====
+  container.addEventListener('touchstart', e => {
+    // 드로잉 모드 중이면 가격 커서 비활성 (드로잉 우선)
+    if (STATE.drawMode && STATE.drawMode !== 'none') return;
+    const t = e.touches[0];
+    _priceCursorTimer = setTimeout(() => {
+      showCursor(t.clientY);
+    }, LONG_PRESS_MS);
+  }, { passive: true });
+  container.addEventListener('touchmove', e => {
+    if (_priceCursorActive) {
+      e.preventDefault(); // 커서 활성 시 차트 스크롤 막고 가격선 이동
+      updateCursorAt(e.touches[0].clientY);
+    } else {
+      // 아직 롱프레스 판정 전 움직이면 취소
+      if (_priceCursorTimer) { clearTimeout(_priceCursorTimer); _priceCursorTimer = null; }
+    }
+  }, { passive: false });
+  container.addEventListener('touchend', hideCursor, { passive: true });
+  container.addEventListener('touchcancel', hideCursor, { passive: true });
+
+  // ===== 마우스 (PC) — 길게 누르기 =====
+  container.addEventListener('mousedown', e => {
+    if (STATE.drawMode && STATE.drawMode !== 'none') return;
+    if (e.button !== 0) return;
+    _priceCursorTimer = setTimeout(() => {
+      showCursor(e.clientY);
+    }, LONG_PRESS_MS);
+  });
+  container.addEventListener('mousemove', e => {
+    if (_priceCursorActive) updateCursorAt(e.clientY);
+  });
+  window.addEventListener('mouseup', hideCursor);
 }
 
 function getVisibleCandles() {
