@@ -169,6 +169,11 @@ body[data-layout="mobile"] .game-header-mobile{background:var(--bg-panel);border
 .gh-day-mobile{font-family:'Orbitron',sans-serif;color:var(--gold);text-align:right;flex-shrink:0}
 .gh-day-mobile .gh-day-num{font-size:14px;font-weight:700}
 .gh-day-mobile .gh-day-date{font-size:9px;color:var(--text-dim)}
+/* v0.9.13: DAY 표시를 뒤로가기 버튼 오른쪽으로 (우측 토글버튼에 가리던 문제) */
+.gh-day-mobile.gh-day-left{text-align:left}
+.gh-day-mobile.gh-day-left .gh-day-num{font-size:12px}
+/* 모바일 종목명 영역은 우측 토글버튼 공간만큼 여백 */
+body[data-layout="mobile"] .game-header-mobile .gh-stock-mobile{padding-right:70px}
 
 body[data-layout="mobile"] .chart-wrap-mobile{flex:1;min-height:300px;position:relative;background:var(--bg-panel)}
 body[data-layout="mobile"] #chart-mobile{width:100%;height:100%}
@@ -1647,13 +1652,13 @@ var BULLSWING_FB = { ready:false, db:null, error:null };
   <!-- 모바일 헤더 -->
   <div class="mobile-only game-header-mobile">
     <button class="gh-back-mobile" onclick="confirmQuit()">◀</button>
+    <div class="gh-day-mobile gh-day-left">
+      <div class="gh-day-num" id="gh-day-num-mobile">DAY 1/60</div>
+      <div class="gh-day-date" id="gh-day-date-mobile">-</div>
+    </div>
     <div class="gh-stock-mobile">
       <div class="gh-name" id="gh-name-mobile">종목 A</div>
       <div class="gh-price" id="gh-price-mobile">-</div>
-    </div>
-    <div class="gh-day-mobile">
-      <div class="gh-day-num" id="gh-day-num-mobile">DAY 1/60</div>
-      <div class="gh-day-date" id="gh-day-date-mobile">-</div>
     </div>
   </div>
 
