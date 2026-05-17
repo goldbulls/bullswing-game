@@ -102,6 +102,13 @@ body[data-layout="mobile"] .history-item .h-return{font-size:10px;min-width:auto
 .mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
 body[data-layout="mobile"] .mode-grid{gap:8px;margin-bottom:12px}
 .mode-card{background:var(--bg-panel);border:2px solid var(--border);border-radius:12px;padding:24px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden}
+/* v0.9.15: 통합 모드 배너 */
+.unified-mode-banner{display:flex;align-items:center;justify-content:center;gap:8px;
+  background:linear-gradient(135deg,rgba(232,201,106,0.1),rgba(232,201,106,0.03));
+  border:1px solid rgba(232,201,106,0.3);border-radius:10px;padding:12px;margin-bottom:14px}
+.umb-icon{font-size:18px}
+.umb-text{font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;color:var(--gold-bright)}
+body[data-layout="mobile"] .umb-text{font-size:10px}
 body[data-layout="mobile"] .mode-card{padding:14px 10px;text-align:center}
 .mode-card:hover{border-color:var(--gold);transform:translateY(-2px)}
 .mode-card.selected{border-color:var(--gold);background:var(--bg-card);box-shadow:0 0 20px rgba(201,168,76,0.2)}
@@ -154,6 +161,8 @@ body[data-layout="pc"] .bottom-area-pc{grid-column:1 / span 2;grid-row:2;display
   letter-spacing:1.5px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
 
 body[data-layout="pc"] #chart-pc{width:100%;height:430px}
+/* v0.9.15: PC 거래량 별도 패널 (캔들 70 : 거래량 30 → 430 : 184) */
+body[data-layout="pc"] .volume-pane{width:100%;height:184px;margin-top:2px}
 
 /* ============================================================ */
 /* GAME SCREEN — 모바일 레이아웃 (풀스크린)                     */
@@ -175,8 +184,13 @@ body[data-layout="mobile"] .game-header-mobile{background:var(--bg-panel);border
 /* 모바일 종목명 영역은 우측 토글버튼 공간만큼 여백 */
 body[data-layout="mobile"] .game-header-mobile .gh-stock-mobile{padding-right:70px}
 
-body[data-layout="mobile"] .chart-wrap-mobile{flex:1;min-height:300px;position:relative;background:var(--bg-panel)}
+body[data-layout="mobile"] .chart-wrap-mobile{flex:1;min-height:300px;position:relative;background:var(--bg-panel);
+  display:flex;flex-direction:column}
+/* v0.9.15: 모바일 캔들 70 : 거래량 30 분할 */
+body[data-layout="mobile"] #chart-candle-area-mobile{flex:7;min-height:0;position:relative;width:100%}
 body[data-layout="mobile"] #chart-mobile{width:100%;height:100%}
+body[data-layout="mobile"] .volume-pane-mobile{flex:3;min-height:0;width:100%;
+  border-top:1px solid var(--border)}
 
 body[data-layout="mobile"] .signal-mini{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--bg-card);
   border-top:1px solid var(--border);flex-shrink:0;font-size:11px}
@@ -1378,7 +1392,12 @@ var BULLSWING_FB = { ready:false, db:null, error:null };
 
       <!-- ━━ 탭 1: 게임 시작 (메인 콘텐츠) ━━ -->
       <div class="start-tab-content active" id="start-tab-start">
-        <div class="mode-grid">
+        <!-- v0.9.15: 통합 모드 — 모드 선택 숨김, 전체 시나리오 풀 -->
+        <div class="unified-mode-banner">
+          <span class="umb-icon">🎲</span>
+          <span class="umb-text">전체 종목 무작위 출제 · 테스트 진행 중</span>
+        </div>
+        <div class="mode-grid" id="mode-grid" style="display:none">
           <div class="mode-card selected" data-mode="leader" onclick="selectMode('leader')">
             <div class="mode-tag pro">PRO</div>
             <div class="mode-icon">🔥</div>
@@ -1717,6 +1736,8 @@ var BULLSWING_FB = { ready:false, db:null, error:null };
           <div class="price-cursor-label" id="price-cursor-label-pc">-</div>
         </div>
       </div>
+      <!-- v0.9.15: 거래량 별도 패널 -->
+      <div id="volume-pc" class="volume-pane"></div>
       <div class="pattern-info" id="pattern-info-pc">
         <div class="pi-header">
           <span class="pi-icon" id="pi-icon-pc"></span>
@@ -1813,7 +1834,7 @@ var BULLSWING_FB = { ready:false, db:null, error:null };
   </div>
 
   <div class="chart-wrap-mobile mobile-only">
-    <div class="chart-draw-wrap" style="width:100%;height:100%">
+    <div class="chart-draw-wrap" id="chart-candle-area-mobile">
       <div id="chart-mobile"></div>
       <canvas class="draw-canvas" id="draw-canvas-mobile"></canvas>
       <div class="draw-mode-indicator" id="draw-indicator-mobile"></div>
@@ -1823,6 +1844,8 @@ var BULLSWING_FB = { ready:false, db:null, error:null };
         <div class="price-cursor-label" id="price-cursor-label-mobile">-</div>
       </div>
     </div>
+    <!-- v0.9.15: 거래량 별도 패널 -->
+    <div id="volume-mobile" class="volume-pane-mobile"></div>
   </div>
 
   <div class="ma-toggle-row mobile-only">
@@ -2070,8 +2093,22 @@ window.addEventListener('resize', () => {
   }
   // 차트 리사이즈
   if (chart) {
-    const c = getCurrentLayout() === 'pc' ? document.getElementById('chart-pc') : document.getElementById('chart-mobile');
-    if (c) chart.applyOptions({ width: c.clientWidth, height: c.clientHeight || 430 });
+    const layout = getCurrentLayout();
+    if (layout === 'pc') {
+      const c = document.getElementById('chart-pc');
+      if (c) chart.applyOptions({ width: c.clientWidth, height: 430 });
+      if (volumeChart) {
+        const v = document.getElementById('volume-pc');
+        if (v) volumeChart.applyOptions({ width: v.clientWidth, height: 184 });
+      }
+    } else {
+      const ca = document.getElementById('chart-candle-area-mobile');
+      if (ca) chart.applyOptions({ width: ca.clientWidth, height: ca.clientHeight || 300 });
+      if (volumeChart) {
+        const v = document.getElementById('volume-mobile');
+        if (v) volumeChart.applyOptions({ width: v.clientWidth, height: v.clientHeight || 130 });
+      }
+    }
   }
 });
 
@@ -2614,6 +2651,7 @@ const STATE = {
 };
 
 let chart = null, candleSeries = null, volumeSeries = null;
+let volumeChart = null; // v0.9.15: 거래량 별도 차트
 let maSeries = {};
 let replayChart = null;
 
@@ -2679,10 +2717,21 @@ function renderStartScreen() {
   }
 }
 
+// ┌──────────────────────────────────────────────────────────┐
+// │  ⚙️ 통합 시나리오 모드 스위치  (v0.9.15)                    │
+// │                                                            │
+// │  UNIFIED_SCENARIO_MODE = true  → 모드 선택 숨김, 전체 풀    │
+// │  UNIFIED_SCENARIO_MODE = false → 주도주/무작위 모드 분리    │
+// │                                                            │
+// │  ※ 테스트 기간엔 true (전체 79개 통합), 정식 땐 false       │
+// └──────────────────────────────────────────────────────────┘
+const UNIFIED_SCENARIO_MODE = true;
+
 function selectMode(mode) {
   STATE.mode = mode;
   document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
-  document.querySelector(`.mode-card[data-mode="${mode}"]`).classList.add('selected');
+  const card = document.querySelector(`.mode-card[data-mode="${mode}"]`);
+  if (card) card.classList.add('selected');
 }
 
 function pickScenario(mode) {
@@ -2690,8 +2739,14 @@ function pickScenario(mode) {
     console.warn('[BULLSWING] SCENARIOS 비어있음 → FALLBACK 사용');
     SCENARIOS = FALLBACK_SCENARIOS;
   }
-  let pool = mode === 'leader' ? SCENARIOS.filter(s => s.mode === 'leader') : SCENARIOS.slice();
-  // pool이 비어있으면 (예: random 모드인데 시나리오 다 leader인 경우) 전체에서 픽
+  // v0.9.15: 통합 모드면 모드 무시하고 전체 풀에서 추출
+  let pool;
+  if (UNIFIED_SCENARIO_MODE) {
+    pool = SCENARIOS.slice();
+  } else {
+    pool = mode === 'leader' ? SCENARIOS.filter(s => s.mode === 'leader') : SCENARIOS.slice();
+  }
+  // pool이 비어있으면 전체에서 픽
   if (pool.length === 0) pool = SCENARIOS.slice();
   return pool[Math.floor(Math.random() * pool.length)];
 }
@@ -2776,8 +2831,13 @@ function initGameChart() {
     return;
   }
   if (chart) { chart.remove(); chart = null; }
+  if (volumeChart) { volumeChart.remove(); volumeChart = null; }
   maSeries = {};
-  const chartHeight = layout === 'pc' ? 430 : container.clientHeight;
+  // v0.9.15: 캔들 영역 높이 (모바일은 분할된 캔들 영역 기준)
+  const candleArea = layout === 'pc'
+    ? container
+    : document.getElementById('chart-candle-area-mobile');
+  const chartHeight = layout === 'pc' ? 430 : (candleArea ? candleArea.clientHeight : 300);
   chart = LightweightCharts.createChart(container, {
     width: container.clientWidth, height: chartHeight,
     layout: { background: { color: '#0B0F18' }, textColor: '#8A93A6', fontFamily: 'Orbitron, sans-serif', fontSize: layout === 'pc' ? 11 : 10 },
@@ -2802,18 +2862,85 @@ function initGameChart() {
     borderUpColor: '#EF4444', borderDownColor: '#3B82F6',
     wickUpColor: '#EF4444', wickDownColor: '#3B82F6'
   });
-  volumeSeries = chart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: 'volume', color: '#5A6478' });
-  chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.75, bottom: 0 } });
   const maColors = { 5: '#FF4D4D', 10: '#FF9933', 20: '#FFD23F', 60: '#33CC66', 120: '#3399FF', 240: '#B366FF' };
   [5, 10, 20, 60, 120, 240].forEach(p => {
     maSeries[p] = chart.addLineSeries({ color: maColors[p], lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
   });
+
+  // ── v0.9.15: 거래량 별도 차트 ──
+  const volContainer = layout === 'pc'
+    ? document.getElementById('volume-pc')
+    : document.getElementById('volume-mobile');
+  if (volContainer) {
+    const volHeight = layout === 'pc' ? 184 : (volContainer.clientHeight || 130);
+    volumeChart = LightweightCharts.createChart(volContainer, {
+      width: volContainer.clientWidth, height: volHeight,
+      layout: { background: { color: '#0B0F18' }, textColor: '#8A93A6', fontFamily: 'Orbitron, sans-serif', fontSize: layout === 'pc' ? 11 : 10 },
+      grid: { vertLines: { color: '#1F2738' }, horzLines: { color: '#1F2738' } },
+      rightPriceScale: { borderColor: '#1F2738' },
+      timeScale: { borderColor: '#1F2738', timeVisible: layout === 'pc' },
+      crosshair: {
+        mode: LightweightCharts.CrosshairMode.Normal,
+        vertLine: { labelVisible: false },
+        horzLine: { labelVisible: false }
+      },
+      handleScale: {
+        axisPressedMouseMove: { time: true, price: false },
+        axisDoubleClickReset: true, mouseWheel: true, pinch: true
+      }
+    });
+    volumeSeries = volumeChart.addHistogramSeries({ priceFormat: { type: 'volume' }, color: '#5A6478' });
+    volumeChart.priceScale('right').applyOptions({ scaleMargins: { top: 0.1, bottom: 0 } });
+    // 캔들 차트는 시간축 라벨 숨김 (거래량 차트에만 날짜 표시)
+    chart.timeScale().applyOptions({ visible: false });
+    // ── 시간축 양방향 동기화 (스크롤/줌 같이 움직임) ──
+    let _syncing = false;
+    chart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+      if (_syncing || !range || !volumeChart) return;
+      _syncing = true;
+      volumeChart.timeScale().setVisibleLogicalRange(range);
+      _syncing = false;
+    });
+    volumeChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+      if (_syncing || !range || !chart) return;
+      _syncing = true;
+      chart.timeScale().setVisibleLogicalRange(range);
+      _syncing = false;
+    });
+    // 크로스헤어 동기화 (한쪽에 마우스 올리면 다른쪽도 세로선)
+    chart.subscribeCrosshairMove(param => {
+      if (!volumeChart) return;
+      if (param && param.time !== undefined) {
+        volumeChart.setCrosshairPosition(0, param.time, volumeSeries);
+      } else {
+        volumeChart.clearCrosshairPosition();
+      }
+    });
+    volumeChart.subscribeCrosshairMove(param => {
+      if (!chart || !candleSeries) return;
+      if (param && param.time !== undefined) {
+        const cd = STATE._lastVisible && STATE._lastVisible.find(d => d.time === param.time);
+        chart.setCrosshairPosition(cd ? cd.close : 0, param.time, candleSeries);
+      } else {
+        chart.clearCrosshairPosition();
+      }
+    });
+  } else {
+    // 폴백: 거래량 컨테이너 없으면 기존 방식 (캔들 차트에 겹침)
+    volumeSeries = chart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: 'volume', color: '#5A6478' });
+    chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.75, bottom: 0 } });
+  }
+
   chart.subscribeCrosshairMove(param => {
     if (!param || !param.time || !param.seriesData) { restoreCurrentOhlcv(); if (layout === 'pc') hidePatternInfoPc(); return; }
     const cd = param.seriesData.get(candleSeries);
     if (!cd) { restoreCurrentOhlcv(); if (layout === 'pc') hidePatternInfoPc(); return; }
-    const vd = param.seriesData.get(volumeSeries);
-    updateOhlcvBar(param.time, cd.open, cd.high, cd.low, cd.close, vd ? vd.value : 0);
+    let vol = 0;
+    if (STATE._lastVisible) {
+      const vd = STATE._lastVisible.find(d => d.time === param.time);
+      if (vd) vol = vd.volume || 0;
+    }
+    updateOhlcvBar(param.time, cd.open, cd.high, cd.low, cd.close, vol);
     if (layout === 'pc') showPatternInfoForTimePc(param.time);
   });
   // v0.9.14: 가격 커서 (꾹 누르면 가로선+가격)
@@ -2990,8 +3117,9 @@ function renderChart() {
   if (!chart || !candleSeries) return;
   const visible = getVisibleCandles();
   candleSeries.setData(visible);
-  const volData = visible.map(c => ({ time: c.time, value: c.volume, color: c.close >= c.open ? 'rgba(239,68,68,0.5)' : 'rgba(59,130,246,0.5)' }));
-  volumeSeries.setData(volData);
+  STATE._lastVisible = visible; // v0.9.15: 크로스헤어 동기화/OHLC 조회용
+  const volData = visible.map(c => ({ time: c.time, value: c.volume, color: c.close >= c.open ? 'rgba(239,68,68,0.6)' : 'rgba(59,130,246,0.6)' }));
+  if (volumeSeries) volumeSeries.setData(volData);
   // 사전 240일 + 매매 일자 전체 캔들로 이평선 계산 → Day 1부터 정확
   [5, 10, 20, 60, 120, 240].forEach(p => {
     if (STATE.maEnabled[p]) maSeries[p].setData(calculateMA(visible, p));
