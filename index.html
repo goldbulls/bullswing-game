@@ -1022,6 +1022,9 @@ body[data-layout="mobile"] .mp-name{font-size:12px}
 .mp-bolt{font-size:11px;line-height:1;transition:all 0.3s}
 .mp-bolt.on{filter:drop-shadow(0 0 3px #E8C96A)}
 .mp-bolt.off{filter:grayscale(1) brightness(0.4);opacity:0.5}
+/* v0.9.13: 테스트 모드 무한 에너지 표시 */
+.mp-energy-inf{font-family:'Orbitron',sans-serif;font-size:14px;font-weight:900;
+  color:#E8C96A;margin-left:1px;text-shadow:0 0 6px rgba(232,201,106,0.6)}
 .mp-energy-timer{font-family:'Orbitron',sans-serif;font-size:8px;color:var(--gold-bright);
   margin-left:4px;letter-spacing:0.3px}
 /* v0.9.7: PERFECT TRADE 배지 */
@@ -2455,11 +2458,25 @@ function defaultRecords() {
 // ============================================================
 // v0.9.8: 에너지(번개) 시스템 — 하루 5개, 30분당 1개 충전, 1판 = 1개
 // ============================================================
+// ┌──────────────────────────────────────────────────────────┐
+// │  ⚙️ 테스트 모드 스위치  (v0.9.13)                          │
+// │                                                            │
+// │  TEST_MODE_UNLIMITED_ENERGY = true  → 모든 유저 에너지 무한 │
+// │  TEST_MODE_UNLIMITED_ENERGY = false → 정상 (하루 5개)       │
+// │                                                            │
+// │  ※ 테스트 기간엔 true, 정식 출시 땐 false 로 바꿔 재배포    │
+// └──────────────────────────────────────────────────────────┘
+const TEST_MODE_UNLIMITED_ENERGY = true;
+
 const ENERGY_MAX = 5;                       // 상한
 const ENERGY_RECHARGE_MS = 30 * 60 * 1000;  // 30분
 
 // 현재 에너지 상태 계산 (자정 리셋 + 30분 충전 반영)
 function getEnergyState() {
+  // v0.9.13: 테스트 모드면 항상 가득 찬 상태로 반환 (소모 없음)
+  if (TEST_MODE_UNLIMITED_ENERGY) {
+    return { energy: ENERGY_MAX, max: ENERGY_MAX, nextInMs: 0, unlimited: true };
+  }
   const r = loadRecords();
   const now = Date.now();
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
@@ -2503,6 +2520,8 @@ function getEnergyState() {
 
 // 에너지 1개 소모 (게임 시작 시 호출) — 성공 시 true
 function consumeEnergy() {
+  // v0.9.13: 테스트 모드면 소모하지 않음
+  if (TEST_MODE_UNLIMITED_ENERGY) return true;
   const st = getEnergyState();
   if (st.energy <= 0) return false;
   const r = loadRecords();
@@ -4018,7 +4037,8 @@ function refreshAdminStatus(){
   if(el){
     el.textContent=
       `닉네임: ${getNickname()}\n`+
-      `에너지: ${en.energy}/${en.max}\n`+
+      `🔋 테스트 모드(무한 에너지): ${TEST_MODE_UNLIMITED_ENERGY ? 'ON' : 'OFF'}\n`+
+      `에너지: ${en.unlimited ? '무한 ∞' : en.energy+'/'+en.max}\n`+
       `자산: ₩${Math.round(r.currentAsset||0).toLocaleString()}\n`+
       `XP: ${g.xp.toLocaleString()} (Lv ${lv})\n`+
       `앰블럼: ${(g.earned||[]).length}/63\n`+
@@ -4745,12 +4765,18 @@ function renderMiniProfile(){
   // v0.9.8: 에너지(번개) 상태
   const en=getEnergyState();
   let boltsHtml='';
-  for(let i=0;i<en.max;i++){
-    boltsHtml+=`<span class="mp-bolt ${i<en.energy?'on':'off'}">⚡</span>`;
+  let timerHtml='';
+  if(en.unlimited){
+    // v0.9.13: 테스트 모드 — 무한 표시
+    boltsHtml=`<span class="mp-bolt on">⚡</span><span class="mp-energy-inf">∞</span>`;
+  }else{
+    for(let i=0;i<en.max;i++){
+      boltsHtml+=`<span class="mp-bolt ${i<en.energy?'on':'off'}">⚡</span>`;
+    }
+    timerHtml=en.energy<en.max
+      ?`<span class="mp-energy-timer" id="mp-energy-timer">+${fmtEnergyTime(en.nextInMs)}</span>`
+      :'';
   }
-  const timerHtml=en.energy<en.max
-    ?`<span class="mp-energy-timer" id="mp-energy-timer">+${fmtEnergyTime(en.nextInMs)}</span>`
-    :'';
   el.innerHTML=`
     <div class="mp-energy mp-energy-corner">${boltsHtml}${timerHtml}</div>
     <div class="mp-avatar" style="color:${tier.color};background:${tier.color}15">${lv}</div>
