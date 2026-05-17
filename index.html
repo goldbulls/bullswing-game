@@ -210,9 +210,9 @@ body[data-layout="mobile"] .action-bar{background:var(--bg-panel);border-top:1px
 .ohlcv-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;
   font-family:'Orbitron',sans-serif;font-size:11px;
   padding:6px 10px;background:var(--bg-card);border-radius:4px;margin-bottom:8px;min-height:32px}
-body[data-layout="mobile"] .ohlcv-bar{flex-wrap:nowrap;overflow-x:auto;white-space:nowrap;
+body[data-layout="mobile"] .ohlcv-bar{display:flex !important;flex-wrap:nowrap;overflow-x:auto;white-space:nowrap;
   -webkit-overflow-scrolling:touch;border-radius:0;border-bottom:1px solid var(--border);
-  margin-bottom:0;gap:7px;padding:3px 10px;font-size:9px;min-height:24px}
+  margin-bottom:0;gap:7px;padding:3px 10px;font-size:9px;min-height:24px;align-items:center}
 .ohlcv-bar .ov-item{display:flex;gap:4px;align-items:center;flex-shrink:0}
 .ohlcv-bar .ov-label{color:var(--text-dim);font-size:10px}
 body[data-layout="mobile"] .ohlcv-bar .ov-label{font-size:8px}
@@ -226,9 +226,9 @@ body[data-layout="mobile"] .ohlcv-bar .ov-date{margin-right:5px}
 /* MA + 패턴 토글 (공통)                                         */
 /* ============================================================ */
 .ma-toggle-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;align-items:center}
-body[data-layout="mobile"] .ma-toggle-row{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;
+body[data-layout="mobile"] .ma-toggle-row{display:flex !important;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;
   white-space:nowrap;padding:4px 10px;background:var(--bg-panel);border-top:1px solid var(--border);
-  flex-shrink:0;margin-bottom:0;gap:4px}
+  flex-shrink:0;margin-bottom:0;gap:4px;align-items:center}
 .ma-toggle{font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;
   padding:3px 10px;border-radius:12px;cursor:pointer;
   border:1px solid var(--border);background:var(--bg-card);user-select:none;transition:all 0.15s;flex-shrink:0}
