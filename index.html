@@ -2788,6 +2788,13 @@ function initGameChart() {
       mode: LightweightCharts.CrosshairMode.Normal,
       vertLine: { labelVisible: false },
       horzLine: { labelVisible: false }
+    },
+    // v0.9.14: 가격축 드래그로 차트 스케일 변경 막기 (가격 커서와 충돌 방지)
+    handleScale: {
+      axisPressedMouseMove: { time: true, price: false },
+      axisDoubleClickReset: true,
+      mouseWheel: true,
+      pinch: true
     }
   });
   candleSeries = chart.addCandlestickSeries({
@@ -2846,9 +2853,24 @@ function setupPriceCursor(layout) {
     updateCursorAt(clientY);
   }
   function hideCursor() {
+    if (!_priceCursorActive && !_priceCursorTimer) return;
     _priceCursorActive = false;
     cursor.classList.remove('active');
     if (_priceCursorTimer) { clearTimeout(_priceCursorTimer); _priceCursorTimer = null; }
+  }
+
+  // 차트 조작 잠금/해제 헬퍼
+  function lockChart() {
+    if (chart) chart.applyOptions({ handleScroll: false, handleScale: false });
+  }
+  function unlockChart() {
+    if (chart) chart.applyOptions({
+      handleScroll: true,
+      handleScale: {
+        axisPressedMouseMove: { time: true, price: false },
+        axisDoubleClickReset: true, mouseWheel: true, pinch: true
+      }
+    });
   }
 
   // ===== 터치 (모바일) =====
@@ -2856,6 +2878,7 @@ function setupPriceCursor(layout) {
     // 드로잉 모드 중이면 가격 커서 비활성 (드로잉 우선)
     if (STATE.drawMode && STATE.drawMode !== 'none') return;
     const t = e.touches[0];
+    lockChart(); // 누르는 즉시 차트 잠금 (롱프레스 실패하면 곧 해제)
     _priceCursorTimer = setTimeout(() => {
       showCursor(t.clientY);
     }, LONG_PRESS_MS);
@@ -2865,25 +2888,33 @@ function setupPriceCursor(layout) {
       e.preventDefault(); // 커서 활성 시 차트 스크롤 막고 가격선 이동
       updateCursorAt(e.touches[0].clientY);
     } else {
-      // 아직 롱프레스 판정 전 움직이면 취소
+      // 아직 롱프레스 판정 전 움직임 = 차트 스크롤 의도 → 커서 취소 + 차트 잠금 해제
       if (_priceCursorTimer) { clearTimeout(_priceCursorTimer); _priceCursorTimer = null; }
+      unlockChart();
     }
   }, { passive: false });
-  container.addEventListener('touchend', hideCursor, { passive: true });
-  container.addEventListener('touchcancel', hideCursor, { passive: true });
+  container.addEventListener('touchend', () => { hideCursor(); unlockChart(); }, { passive: true });
+  container.addEventListener('touchcancel', () => { hideCursor(); unlockChart(); }, { passive: true });
 
   // ===== 마우스 (PC) — 길게 누르기 =====
   container.addEventListener('mousedown', e => {
     if (STATE.drawMode && STATE.drawMode !== 'none') return;
     if (e.button !== 0) return;
+    lockChart();
     _priceCursorTimer = setTimeout(() => {
       showCursor(e.clientY);
     }, LONG_PRESS_MS);
   });
   container.addEventListener('mousemove', e => {
-    if (_priceCursorActive) updateCursorAt(e.clientY);
+    if (_priceCursorActive) {
+      updateCursorAt(e.clientY);
+    } else if (_priceCursorTimer) {
+      // 롱프레스 전 움직임 = 드래그 스크롤 의도 → 취소
+      clearTimeout(_priceCursorTimer); _priceCursorTimer = null;
+      unlockChart();
+    }
   });
-  window.addEventListener('mouseup', hideCursor);
+  window.addEventListener('mouseup', () => { hideCursor(); unlockChart(); });
 }
 
 function getVisibleCandles() {
