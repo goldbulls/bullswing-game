@@ -2017,10 +2017,17 @@ function toggleLayout() {
 }
 
 function initLayout() {
+  // v0.9.13: 모바일 기기면 저장된 수동 설정 무시하고 무조건 mobile
+  //   (폰에서 PC 레이아웃이 저장돼 화면이 깨지던 문제 수정)
+  const auto = detectAutoLayout();
+  if (auto === 'mobile') {
+    applyLayout('mobile');
+    return;
+  }
+  // PC 기기에서만 저장된 수동 토글 설정 적용
   let saved = null;
   try { saved = localStorage.getItem(LAYOUT_KEY); } catch (e) {}
-  const layout = saved || detectAutoLayout();
-  applyLayout(layout);
+  applyLayout(saved || auto);
 }
 
 // 윈도우 리사이즈 시 (저장된 값 없을 때만 자동 전환)
